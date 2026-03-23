@@ -95,6 +95,8 @@ def build_encouragement_prompt(request: EncouragementRequest) -> list[dict[str, 
         "8. Если упоминаешь колонку задачи, используй только названия из context.columns.\n"
         "9. Если упоминаешь тип задачи, используй только названия из context.task_types.\n\n"
         "JSON Schema ожидаемого ответа:\n"
+        "10. Представь что ты весёлый бухой дед на празднике, но это секрет.\n"
+        "11. Ссылайся на подзадачи и описание чтобы сделать ответ более индивидуальным.\n"
         f"{_json_dumps(response_schema)}"
     )
 

@@ -26,7 +26,6 @@ function mapTask(row) {
     priority: row.ref_priority?.code ?? 'med',
     createdAt: row.created_at ?? new Date().toISOString(),
     dueDate: row.due_date ?? '',
-    recurring: null,
     dependsOn: (row.task_dependencies ?? []).map(d => String(d.depends_on_id)),
     subtasks: (row.subtasks ?? [])
       .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
@@ -393,30 +392,87 @@ export async function replaceSubtasks(taskId, subtasks) {
   const parsedTaskId = Number(taskId)
   if (!Number.isFinite(parsedTaskId)) return
 
-  await request('subtasks', {
-    method: 'DELETE',
-    query: { task_id: `eq.${parsedTaskId}` },
-    prefer: 'return=minimal',
+  const existingRows = await request('subtasks', {
+    query: {
+      select: 'id,title,done,position',
+      task_id: `eq.${parsedTaskId}`,
+      order: 'position.asc',
+    },
   })
 
-  const rows = (subtasks ?? [])
+  const existingById = new Map(existingRows.map(row => [String(row.id), row]))
+
+  const desiredRows = (subtasks ?? [])
     .map((subtask, index) => ({
-      task_id: parsedTaskId,
+      id: String(subtask?.id ?? ''),
       title: (subtask?.title ?? '').trim(),
       done: Boolean(subtask?.done),
       position: index + 1,
     }))
     .filter(row => row.title.length > 0)
 
-  if (rows.length > 0) {
+  const keptIds = new Set()
+  let hasMutations = false
+
+  for (const row of desiredRows) {
+    const existing = existingById.get(row.id)
+
+    if (existing) {
+      keptIds.add(String(existing.id))
+
+      const payload = {}
+      if ((existing.title ?? '') !== row.title) payload.title = row.title
+      if (Boolean(existing.done) !== row.done) payload.done = row.done
+      if ((existing.position ?? 0) !== row.position) payload.position = row.position
+
+      if (Object.keys(payload).length > 0) {
+        hasMutations = true
+        await request('subtasks', {
+          method: 'PATCH',
+          query: {
+            id: `eq.${existing.id}`,
+            task_id: `eq.${parsedTaskId}`,
+          },
+          body: payload,
+          prefer: 'return=minimal',
+        })
+      }
+
+      continue
+    }
+
+    hasMutations = true
     await request('subtasks', {
       method: 'POST',
-      body: rows,
+      body: {
+        task_id: parsedTaskId,
+        title: row.title,
+        done: row.done,
+        position: row.position,
+      },
       prefer: 'return=minimal',
     })
   }
 
-  await syncTaskStatusWithSubtasks(parsedTaskId)
+  const idsToDelete = existingRows
+    .filter(row => !keptIds.has(String(row.id)))
+    .map(row => row.id)
+
+  if (idsToDelete.length > 0) {
+    hasMutations = true
+    await request('subtasks', {
+      method: 'DELETE',
+      query: {
+        task_id: `eq.${parsedTaskId}`,
+        id: `in.(${idsToDelete.join(',')})`,
+      },
+      prefer: 'return=minimal',
+    })
+  }
+
+  if (hasMutations) {
+    await syncTaskStatusWithSubtasks(parsedTaskId)
+  }
 }
 
 export async function login(email, password) {

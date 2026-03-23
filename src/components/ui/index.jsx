@@ -77,13 +77,79 @@ export function formatDate(iso) {
   return d.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+function parseDueValue(dueValue) {
+  if (!dueValue) return null
+
+  const stringValue = String(dueValue).trim()
+  if (!stringValue) return null
+
+  const hasTime = /T\d{2}:\d{2}/.test(stringValue)
+  const date = new Date(stringValue)
+  if (!Number.isNaN(date.getTime())) {
+    return { date, hasTime }
+  }
+
+  const dayPart = stringValue.slice(0, 10)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dayPart)) {
+    const fallbackDate = new Date(`${dayPart}T00:00:00`)
+    if (!Number.isNaN(fallbackDate.getTime())) {
+      return { date: fallbackDate, hasTime: false }
+    }
+  }
+
+  return null
+}
+
+function formatTime(date) {
+  return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+}
+
+function startOfDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
 export function formatDue(dateStr) {
-  if (!dateStr) return ''
-  const d = new Date(dateStr + 'T00:00:00')
-  const today = new Date(); today.setHours(0,0,0,0)
-  const diff = Math.round((d - today) / 86400000)
-  if (diff < 0) return { label: 'Просрочено', cls: 'text-red-500' }
-  if (diff === 0) return { label: 'Сегодня', cls: 'text-amber-500' }
-  if (diff === 1) return { label: 'Завтра', cls: 'text-blue-500' }
-  return { label: d.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' }), cls: 'text-gray-400' }
+  const parsed = parseDueValue(dateStr)
+  if (!parsed) return ''
+
+  const now = new Date()
+  const dueDate = parsed.date
+  const dayDiff = Math.round((startOfDay(dueDate) - startOfDay(now)) / 86400000)
+  const overdueByTime = parsed.hasTime && dayDiff === 0 && dueDate.getTime() < now.getTime()
+
+  if (dayDiff < 0 || overdueByTime) {
+    return { label: 'Просрочено', cls: 'text-red-500' }
+  }
+
+  if (dayDiff === 0) {
+    return {
+      label: parsed.hasTime ? `Сегодня, ${formatTime(dueDate)}` : 'Сегодня',
+      cls: 'text-amber-500',
+    }
+  }
+
+  if (dayDiff === 1) {
+    return {
+      label: parsed.hasTime ? `Завтра, ${formatTime(dueDate)}` : 'Завтра',
+      cls: 'text-blue-500',
+    }
+  }
+
+  const dateLabel = dueDate.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' })
+  const label = parsed.hasTime ? `${dateLabel}, ${formatTime(dueDate)}` : dateLabel
+  return { label, cls: 'text-gray-400' }
+}
+
+export function formatDeadline(dateStr) {
+  const parsed = parseDueValue(dateStr)
+  if (!parsed) return String(dateStr ?? '')
+
+  const datePart = parsed.date.toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+
+  if (!parsed.hasTime) return datePart
+  return `${datePart} ${formatTime(parsed.date)}`
 }
