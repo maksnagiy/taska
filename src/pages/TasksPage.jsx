@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Layout from '../components/layout/Layout.jsx'
 import TaskCard from '../components/task/TaskCard.jsx'
 import { Empty } from '../components/ui/index.jsx'
-import { getTasks, getUser, deleteTask, humanizeApiError } from '../store.js'
+import { getTasks, deleteTask, humanizeApiError } from '../store.js'
 
 function ConfirmModal({
   message,
@@ -61,8 +61,6 @@ export default function TasksPage() {
 
     async function load() {
       try {
-        if (!getUser()) { navigateRef.current('/login'); return }
-
         if (tick === 0) setIsLoading(true)
 
         const list = await getTasks()

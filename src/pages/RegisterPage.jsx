@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { register, humanizeApiError } from '../store.js'
+import { register, validatePassword, humanizeApiError } from '../store.js'
 
 export default function RegisterPage() {
   const navigate = useNavigate()
@@ -21,6 +21,12 @@ export default function RegisterPage() {
 
     if (password !== confirmPassword) {
       setError('Пароли не совпадают')
+      return
+    }
+
+    const passwordError = validatePassword(password, email)
+    if (passwordError) {
+      setError(passwordError)
       return
     }
 
@@ -88,8 +94,12 @@ export default function RegisterPage() {
                 type="password"
                 placeholder="••••••••"
                 value={password}
+                maxLength={64}
                 onChange={e => { setPassword(e.target.value); setError('') }}
               />
+              <p className="text-[11px] text-gray-400 mt-1">
+                От 8 до 64 символов, минимум одна буква и одна цифра.
+              </p>
             </div>
 
             <div>
@@ -99,6 +109,7 @@ export default function RegisterPage() {
                 type="password"
                 placeholder="••••••••"
                 value={confirmPassword}
+                maxLength={64}
                 onChange={e => { setConfirmPassword(e.target.value); setError('') }}
               />
             </div>

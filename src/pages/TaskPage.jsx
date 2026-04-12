@@ -130,21 +130,39 @@ export default function TaskPage() {
 
   const due = task.dueDate ? formatDue(task.dueDate) : null
 
+  function deriveTaskStatusFromSubtasks(subtasks) {
+    if (!subtasks.length) return 'todo'
+
+    const doneCount = subtasks.filter(subtask => subtask.done).length
+    if (doneCount === subtasks.length) return 'done'
+    if (doneCount > 0) return 'inprogress'
+    return 'todo'
+  }
+
   async function handleToggleSubtask(subtaskId) {
     // Если запрос уже летит — игнорируем клик. Никакой гонки запросов.
     if (pendingToggles.has(subtaskId)) return
 
     const previous = localSubtasks
-    setLocalSubtasks(prev => prev.map(s =>
-        s.id === subtaskId ? { ...s, done: !s.done } : s
-    ))
+    const previousTaskStatus = task.status
+    const nextSubtasks = localSubtasks.map(subtask =>
+      subtask.id === subtaskId ? { ...subtask, done: !subtask.done } : subtask
+    )
+    const toggledSubtask = nextSubtasks.find(subtask => subtask.id === subtaskId)
+    const nextTaskStatus = deriveTaskStatusFromSubtasks(nextSubtasks)
+
+    setLocalSubtasks(nextSubtasks)
+    setTask(prev => prev ? { ...prev, status: nextTaskStatus } : prev)
     setPendingToggles(prev => new Set(prev).add(subtaskId))
 
     try {
-      await toggleSubtask(id, subtaskId)
-      refresh(undefined, { syncSubtasks: false }).catch(() => {})
+      await toggleSubtask(id, subtaskId, {
+        done: toggledSubtask?.done,
+        nextStatus: nextTaskStatus,
+      })
     } catch (err) {
       setLocalSubtasks(previous)
+      setTask(prev => prev ? { ...prev, status: previousTaskStatus } : prev)
       pushError(humanizeApiError(err, 'Не удалось обновить подзадачу'))
     } finally {
       setPendingToggles(prev => { const s = new Set(prev); s.delete(subtaskId); return s })

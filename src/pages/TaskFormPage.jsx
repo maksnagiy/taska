@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Layout from '../components/layout/Layout.jsx'
-import { AiBubble, Checkbox } from '../components/ui/index.jsx'
+import { AiBubble } from '../components/ui/index.jsx'
 import { getTask, getTasks, createTask, updateTask, replaceSubtasks, humanizeApiError } from '../store.js'
 import { generateTaskDescription, generateTaskDecomposition, humanizeLlmError } from '../llmClient.js'
 
@@ -57,6 +57,7 @@ export default function TaskFormPage() {
   const [aiMode, setAiMode] = useState('')
   const [aiSubtasks, setAiSubtasks] = useState([])
   const [aiApplying, setAiApplying] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -126,15 +127,6 @@ export default function TaskFormPage() {
       subtasks: [...prev.subtasks, createDraftSubtask(title)],
     }))
     setNewSubtask('')
-  }
-
-  function handleToggleDraftSubtask(subtaskId) {
-    setForm(prev => ({
-      ...prev,
-      subtasks: prev.subtasks.map(subtask => (
-        subtask.id === subtaskId ? { ...subtask, done: !subtask.done } : subtask
-      )),
-    }))
   }
 
   function handleDeleteDraftSubtask(subtaskId) {
@@ -224,8 +216,10 @@ export default function TaskFormPage() {
 
   async function handleSubmit(e) {
     e.preventDefault()
+    if (isSaving) return
     if (!form.title.trim()) { setError('Введите название задачи'); return }
 
+    setIsSaving(true)
     setError('')
 
     const { subtasks, ...taskFields } = form
@@ -255,6 +249,8 @@ export default function TaskFormPage() {
       }
     } catch (err) {
       setError(humanizeApiError(err, 'Не удалось сохранить задачу'))
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -330,12 +326,7 @@ export default function TaskFormPage() {
             <ul className="space-y-1.5 mb-3">
               {form.subtasks.map(subtask => (
                 <li key={subtask.id} className="flex items-center gap-2.5 group">
-                  <Checkbox
-                    checked={subtask.done}
-                    size={16}
-                    onChange={() => { handleToggleDraftSubtask(subtask.id) }}
-                  />
-                  <span className={`flex-1 text-sm ${subtask.done ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+                  <span className="flex-1 text-sm text-gray-700">
                     {subtask.title}
                   </span>
                   <button
@@ -449,13 +440,18 @@ export default function TaskFormPage() {
         </div>
 
         <div className="flex gap-2.5">
-          <button type="submit" className="btn btn-primary flex-1 justify-center py-2.5">
-            {isEdit ? 'Сохранить' : 'Создать задачу'}
+          <button
+            type="submit"
+            disabled={isSaving}
+            className="btn btn-primary flex-1 justify-center py-2.5 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isSaving ? (isEdit ? 'Сохраняю...' : 'Создаю...') : (isEdit ? 'Сохранить' : 'Создать задачу')}
           </button>
           <button
             type="button"
+            disabled={isSaving}
             onClick={() => navigate(isEdit ? `/tasks/${id}` : '/tasks')}
-            className="btn btn-secondary"
+            className="btn btn-secondary disabled:opacity-60 disabled:cursor-not-allowed"
           >
             Отмена
           </button>

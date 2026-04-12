@@ -22,13 +22,17 @@ export function StatusBadge({ status }) {
 }
 
 // ── Checkbox ──────────────────────────────────────────────
-export function Checkbox({ checked, onChange, size = 18 }) {
+export function Checkbox({ checked, onChange, disabled = false, size = 18 }) {
   return (
     <button
+      type="button"
       onClick={onChange}
+      disabled={disabled}
       style={{ width: size, height: size }}
-      className={`rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all cursor-pointer
-        ${checked ? 'bg-accent border-accent' : 'border-gray-300 bg-white hover:border-accent'}`}
+      className={`rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all
+        ${disabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}
+        ${checked ? 'bg-accent border-accent' : 'border-gray-300 bg-white'}
+        ${!checked && !disabled ? 'hover:border-accent' : ''}`}
     >
       {checked && (
         <svg viewBox="0 0 10 8" width="10" height="8" fill="none">
